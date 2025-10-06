@@ -144,6 +144,8 @@ func Run(done chan error, o Options) error {
 
 	// Remove the authorization header so the proxy can correctly inject the header.
 	server.Handler = removeAuthorizationHeader(server.Handler)
+	// Properly set the host header so that it matches the host in kubeconfig.
+	server.Handler = setHostHeader(server.Handler, o.KubeConfig)
 
 	if o.OwnerInjection {
 		server.Handler = &injectOwnerReferenceHandler{
@@ -279,6 +281,13 @@ func addWatchToController(owner kubeconfig.NamespacedOwnerReference, cMap *contr
 func removeAuthorizationHeader(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		req.Header.Del("Authorization")
+		h.ServeHTTP(w, req)
+	})
+}
+
+func setHostHeader(h http.Handler, kubeConfig *rest.Config) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		req.Header.Set("Host", kubeConfig.Host)
 		h.ServeHTTP(w, req)
 	})
 }
